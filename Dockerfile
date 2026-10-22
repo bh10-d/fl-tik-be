@@ -42,4 +42,4 @@ RUN mkdir -p uploads
 EXPOSE 3000
 
 # Start command (sync schema to database on startup if new, then run app)
-CMD ["sh", "-c", "npx prisma db push --skip-generate || true; node dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate || true; if [ -f dist/main.js ]; then node dist/main.js; else node dist/src/main.js; fi"]
