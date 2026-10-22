@@ -5,7 +5,9 @@ WORKDIR /app
 
 # Install dependencies first (for docker cache optimization)
 COPY package*.json ./
+COPY prisma ./prisma/
 RUN npm install
+RUN npx prisma generate
 
 # Copy source code and build
 COPY . .
@@ -20,7 +22,9 @@ ENV NODE_ENV=production
 
 # Copy package files and install production dependencies only
 COPY package*.json ./
+COPY prisma ./prisma/
 RUN npm install --omit=dev
+RUN npx prisma generate
 
 # Copy built dist directory from builder
 COPY --from=builder /app/dist ./dist
