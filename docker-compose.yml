@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  fl-tik-be:
+    image: fl-tik-be:1.0.0
+    container_name: fl-tik-be
+    restart: always
+    ports:
+      - "127.0.0.1:4000:3000"
+    # volumes:
+    #   - uploads_data:/app/uploads

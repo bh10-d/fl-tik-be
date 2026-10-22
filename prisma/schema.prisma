@@ -1,0 +1,279 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Influencer {
+  id                   String                    @id @default(cuid())
+  username             String
+  normalizedUsername   String                    @unique
+  displayName          String
+  profileUrl           String
+  avatarUrl            String?
+  externalUserId       String?
+  followers            BigInt?
+  likes                BigInt?
+  category             String?
+  trackingStatus       String                    @default("ACTIVE") // ACTIVE, PAUSED, ERROR, PROVIDER_UNAVAILABLE
+  source               String                    @default("MANUAL") // ECHOTIK_EXPORT, MANUAL, API
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  lastCheckedAt        DateTime?
+  lastSuccessfulSyncAt DateTime?
+  nextScheduledCheckAt DateTime?
+  lastSyncError        String?
+
+  metricSnapshots      InfluencerMetricSnapshot[]
+  videos               Video[]
+  trackingJobs         TrackingJobRun[]
+
+  @@index([normalizedUsername])
+  @@index([trackingStatus])
+  @@index([category])
+  @@index([lastCheckedAt])
+  @@index([followers])
+  @@index([createdAt])
+  @@map("influencers")
+}
+
+model InfluencerMetricSnapshot {
+  id           String     @id @default(cuid())
+  influencerId String
+  source       String     // ECHOTIK_EXPORT, TIKTOK_DISPLAY, EXTERNAL
+  followers    BigInt?
+  likes        BigInt?
+  sales        BigInt?
+  gmv          Float?
+  capturedAt   DateTime   @default(now())
+
+  influencer   Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  @@index([influencerId])
+  @@index([capturedAt])
+  @@map("influencer_metric_snapshots")
+}
+
+model Video {
+  id                  String                    @id @default(cuid())
+  provider            String                    // TIKTOK_DISPLAY, EXTERNAL, MOCK
+  providerVideoId     String
+  creatorId           String
+  caption             String?                   @db.Text
+  videoUrl            String
+  thumbnailUrl        String?
+  publishedAt         DateTime
+  publishedAtSource   String
+  publishedAtVerified Boolean                   @default(false)
+  firstSeenAt         DateTime                  @default(now())
+  lastSeenAt          DateTime                  @default(now())
+  durationSeconds     Int?
+  views               BigInt?
+  likes               BigInt?
+  comments            BigInt?
+  shares              BigInt?
+  dataSource          String
+  rawMetadata         Json?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  creator             Influencer                @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  metricSnapshots     VideoMetricSnapshot[]
+  productAssociations VideoProductAssociation[]
+
+  @@unique([provider, providerVideoId])
+  @@index([creatorId])
+  @@index([publishedAt])
+  @@index([firstSeenAt])
+  @@index([views])
+  @@index([likes])
+  @@map("videos")
+}
+
+model VideoMetricSnapshot {
+  id         String   @id @default(cuid())
+  videoId    String
+  capturedAt DateTime @default(now())
+  views      BigInt?
+  likes      BigInt?
+  comments   BigInt?
+  shares     BigInt?
+  source     String
+
+  video      Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+  @@index([capturedAt])
+  @@map("video_metric_snapshots")
+}
+
+model Shop {
+  id             String    @id @default(cuid())
+  name           String
+  shopUrl        String?
+  externalShopId String?   @unique
+  market         String?
+  trackingStatus String    @default("ACTIVE")
+  source         String    @default("MANUAL")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  products       Product[]
+
+  @@map("shops")
+}
+
+model Product {
+  id                String                    @id @default(cuid())
+  shopId            String?
+  name              String
+  productUrl        String?
+  externalProductId String?                   @unique
+  imageUrl          String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  shop              Shop?                     @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  videoAssociations VideoProductAssociation[]
+
+  @@index([shopId])
+  @@map("products")
+}
+
+model VideoProductAssociation {
+  id             String    @id @default(cuid())
+  videoId        String
+  productId      String
+  evidenceType   String    // TAG, CAPTION_LINK, AFFILIATE_LINK, MANUAL
+  evidenceSource String
+  verifiedAt     DateTime?
+  confidence     Float     @default(1.0)
+  createdAt      DateTime  @default(now())
+
+  video          Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, productId])
+  @@index([videoId])
+  @@index([productId])
+  @@map("video_product_associations")
+}
+
+model TrackingJobRun {
+  id               String     @id @default(cuid())
+  influencerId     String
+  provider         String
+  status           String     // COMPLETED, RUNNING, FAILED, PAUSED
+  startedAt        DateTime   @default(now())
+  completedAt      DateTime?
+  videosDiscovered Int        @default(0)
+  errorCode        String?
+  errorMessage     String?
+  attemptCount     Int        @default(1)
+
+  influencer       Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  @@index([influencerId])
+  @@index([startedAt])
+  @@index([status])
+  @@map("tracking_job_runs")
+}
+
+model ImportBatch {
+  id           String    @id @default(cuid())
+  filename     String
+  source       String    @default("ECHOTIK_EXPORT")
+  status       String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  totalRows    Int       @default(0)
+  insertedRows Int       @default(0)
+  updatedRows  Int       @default(0)
+  skippedRows  Int       @default(0)
+  failedRows   Int       @default(0)
+  errors       Json?     @default("[]")
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@map("import_batches")
+}
+
+
+model DataSourceConfig {
+  id                      String    @id @default(cuid())
+  provider                String    @unique // INTERNAL_CRAWLER
+  isEnabled               Boolean   @default(false)
+  baseUrl                 String?
+  authType                String    @default("NONE") // NONE, BEARER, API_KEY, CUSTOM_HEADER
+  headerName              String?   // For API_KEY or custom header (e.g. x-api-key)
+  encryptedApiKey         String?
+  maskedApiKey            String?
+  settings                Json?     // Provider specific settings
+  status                  String    @default("UNCONFIGURED") // UNCONFIGURED, HEALTHY, DEGRADED, OFFLINE, DISABLED
+  lastTestedAt            DateTime?
+  lastTestStatus          String?   // SUCCESS, FAILED
+  lastTestError           String?
+  lastSuccessfulRequestAt DateTime?
+  lastFailedRequestAt     DateTime?
+  lastError               String?
+  totalRequests           Int       @default(0)
+  successfulRequests      Int       @default(0)
+  failedRequests          Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@map("data_source_configs")
+}
+
+model CollectionPolicy {
+  id                         String    @id @default("default")
+  activeProvider             String    @default("INTERNAL_CRAWLER") // INTERNAL_CRAWLER, MOCK
+  isCollectionActive         Boolean   @default(true) // Global kill switch
+  pollIntervalMinutes        Int       @default(15) // Target 15-minute polling interval
+  maxConcurrentJobs          Int       @default(3)
+  lastCollectionAttemptAt    DateTime?
+  lastSuccessfulCollectionAt DateTime?
+  recentFailureCount         Int       @default(0)
+  lastError                  String?
+  updatedAt                  DateTime  @updatedAt
+
+  @@map("collection_policies")
+}
+
+model ProxyConfig {
+  id                String    @id @default("default")
+  isEnabled         Boolean   @default(false)
+  protocol          String    @default("HTTP") // HTTP, HTTPS, SOCKS5
+  host              String?
+  port              Int?
+  username          String?
+  encryptedPassword String?
+  maskedPassword    String?
+  region            String?   @default("US")
+  notes             String?
+  lastTestedAt      DateTime?
+  lastTestStatus    String?   // SUCCESS, FAILED
+  lastTestError     String?
+  updatedAt         DateTime  @updatedAt
+
+  @@map("proxy_configs")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("ADMIN") // ADMIN, MEMBER
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+
+
