@@ -1,9 +1,28 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding Influencer Monitor database...');
+
+  // 0. Seed Default Admin User
+  const adminEmail = 'admin@liambui.com';
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: adminEmail },
+  });
+  if (!existingAdmin) {
+    const passwordHash = await bcrypt.hash('HoThAo@123', 10);
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        name: 'Liam Bui (Admin)',
+        passwordHash,
+        role: 'ADMIN',
+      },
+    });
+    console.log(`Seeded platform admin user: ${adminEmail}`);
+  }
 
   // 1. Clear existing data in reverse dependency order
   await prisma.videoProductAssociation.deleteMany();

@@ -35,5 +35,5 @@ RUN mkdir -p uploads
 # Expose NestJS application port
 EXPOSE 3000
 
-# Start command
-CMD ["node", "dist/main.js"]
+# Start command (sync schema to database on startup if new, then run app)
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/main.js"]
