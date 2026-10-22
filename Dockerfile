@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Fallback environment for prisma validation during build
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/influencer_monitor?schema=public"
+
 # Install dependencies first (for docker cache optimization)
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -19,6 +22,9 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PORT=3000
+# Default fallback DATABASE_URL (can be overridden via .env or docker compose environment)
+ENV DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:5432/influencer_monitor?schema=public"
 
 # Copy package files and install production dependencies only
 COPY package*.json ./
@@ -36,4 +42,4 @@ RUN mkdir -p uploads
 EXPOSE 3000
 
 # Start command (sync schema to database on startup if new, then run app)
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate || true; node dist/main.js"]

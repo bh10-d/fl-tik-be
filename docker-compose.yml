@@ -2,10 +2,17 @@ version: '3.8'
 
 services:
   fl-tik-be:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: fl-tik-be:1.0.0
     container_name: fl-tik-be
     restart: always
+    env_file:
+      - .env
     ports:
-      - "127.0.0.1:4000:3000"
+      - "4000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # volumes:
     #   - uploads_data:/app/uploads
