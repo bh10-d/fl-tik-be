@@ -160,7 +160,7 @@ export class UpdateCollectionPolicyDto {
   })
   @IsOptional()
   @IsInt()
-  @Min(5)
+  @Min(1)
   @Max(1440)
   pollIntervalMinutes?: number;
 

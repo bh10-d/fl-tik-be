@@ -259,9 +259,19 @@ export class TrackingProcessor extends WorkerHost implements OnModuleDestroy {
         await this.processShopProducts(targetVideoId, productsToProcess);
       }
 
-      const pollIntervalSeconds = Number(
-        this.configService.get<number>('TRACKING_POLL_INTERVAL_SECONDS', 900), // Default 15m (900s)
+      let pollIntervalSeconds = Number(
+        this.configService.get<number>('TRACKING_POLL_INTERVAL_SECONDS', 900),
       );
+      if (this.collectionPolicyService) {
+        try {
+          const policy = await this.collectionPolicyService.getPolicy();
+          if (policy?.pollIntervalMinutes) {
+            pollIntervalSeconds = policy.pollIntervalMinutes * 60;
+          }
+        } catch {
+          // Fallback to configService default
+        }
+      }
       const nextScheduledCheckAt = new Date(Date.now() + pollIntervalSeconds * 1000);
 
       await this.prisma.influencer.update({

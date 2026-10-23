@@ -78,6 +78,27 @@ export class CollectionPolicyService {
       `Collection policy updated: activeProvider=${updated.activeProvider}, active=${updated.isCollectionActive}, interval=${updated.pollIntervalMinutes}m`,
     );
 
+    // If pollIntervalMinutes changed, adjust upcoming checks for active influencers immediately
+    if (dto.pollIntervalMinutes && dto.pollIntervalMinutes !== current.pollIntervalMinutes) {
+      const maxFutureDate = new Date(Date.now() + dto.pollIntervalMinutes * 60 * 1000);
+      try {
+        const result = await this.prisma.influencer.updateMany({
+          where: {
+            trackingStatus: 'ACTIVE',
+            nextScheduledCheckAt: { gt: maxFutureDate },
+          },
+          data: {
+            nextScheduledCheckAt: maxFutureDate,
+          },
+        });
+        this.logger.log(
+          `Rescheduled ${result.count} active influencers to new ${dto.pollIntervalMinutes}m interval ceiling`,
+        );
+      } catch (err: any) {
+        this.logger.warn(`Could not adjust influencer nextScheduledCheckAt: ${err.message}`);
+      }
+    }
+
     return updated;
   }
 
